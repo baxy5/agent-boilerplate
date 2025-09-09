@@ -1,16 +1,18 @@
 import asyncio
+from typing import TypedDict
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.graph import END, MessagesState, StateGraph
+from langgraph.graph import END, StateGraph
 
 from app.services.env_config_service import EnvConfigService
 
 
-class AgentState(MessagesState):
+class AgentState(TypedDict):
   input: str
   output: str
+  chat_history: list[BaseMessage]
 
 
 class ExampleGraph:
@@ -31,28 +33,25 @@ class ExampleGraph:
         streaming=True,
       )
 
+      messages = [
+        SystemMessage("You are a helpful assistant, your task is to answer the user's questions."),
+        *state.get("chat_history", []),
+        HumanMessage(state["input"]),
+      ]
+
       try:
-        # The checkpoint saver automatically provides previous messages
-        messages = state.get("messages", [])
-
-        # Add system message only if it's the first interaction
-        if not messages:
-          messages = [
-            SystemMessage(
-              "You are a helpful assistant, your task is to answer the user's questions."
-            )
-          ]
-
-        # Add current user input
-        messages.append(HumanMessage(state["input"]))
-
         response = await client.ainvoke(messages)
 
-        return {
-          "messages": messages + [response],
-          "input": state["input"],
-          "output": response.content,
-        }
+        # Append new messages to history
+        updated_history = [
+          *state.get("chat_history", []),
+          HumanMessage(content=state["input"]),
+          AIMessage(content=response.content),
+        ]
+
+        state["output"] = response.content
+        state["chat_history"] = updated_history
+        return state
       except Exception as e:
         raise Exception(f"Error while generating response. {e}")
 
@@ -69,12 +68,6 @@ class ExampleGraph:
     result = await self.graph.ainvoke(initial_state, config=config)
 
     return result["output"]
-
-  def get_conversation_history(self, thread_id: str):
-    """Access the automatically saved conversation"""
-    config = {"configurable": {"thread_id": thread_id}}
-    state = self.graph.get_state(config)
-    return state.values.get("messages", [])
 
 
 async def main():
