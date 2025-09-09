@@ -13,8 +13,17 @@ fastapi = { extras = ["standard"], version = "^0.116.1" }
 uvicorn = "^0.35.0"
 langgraph = "^0.6.6"
 langchain = { extras = ["openai"], version = "^0.3.27" }
-black = "^25.1.0"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.12.10"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 120
+indent-width = 2
+# Sort imports
+lint.extend-select = ["I"]
+exclude = [".git", "__pycache__", ".venv"]
