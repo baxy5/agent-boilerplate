@@ -1,93 +1,106 @@
-import os
 import asyncio
-import sys
-from typing import TypedDict, Any
-from dotenv import load_dotenv
+
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, END
-from langchain_core.messages import SystemMessage, HumanMessage
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, MessagesState, StateGraph
 
-load_dotenv()
+from app.services.env_config_service import EnvConfigService
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
-        raise EnvironmentError("OPENAI_API_KEY is not set.")
-    
-class AgentState(TypedDict):
-    input: str
-    output: Any
+
+class AgentState(MessagesState):
+  input: str
+  output: str
+
 
 class ExampleGraph:
-    """ This Graph implementation serves only for example purposes. """
-    def __init__(self):
-        self.graph = self._build_graph()
-        
-    def _build_graph(self):
-        graph = StateGraph(AgentState)
-        
-        async def generate_response(state: AgentState):
-            client = ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY, streaming=True)
-            
-            try:
-                messages = [
-                    SystemMessage("You are a helpful assistant, your task is to answer the user's questions."),
-                    HumanMessage(state["input"])
-                ]
-                
-                response = client.astream(messages)
-                state["output"] = response
-                return state
-            except Exception as e:
-                raise Exception(f"Error while generating response. {e}")
-            
-        graph.add_node("generate_response", generate_response)
-        
-        graph.set_entry_point("generate_response")
-        graph.add_edge("generate_response", END)
-        
-        return graph.compile()
+  """This Graph implementation serves only for example purposes."""
 
-    async def run(self, user_input: str):
-        initial_state = AgentState(input=user_input, output=None)
-        result = await self.graph.ainvoke(initial_state)
-        
-        full_response = ""
-        print("Agent: ", end="", flush=True)
-        
-        async for chunk in result["output"]:
-            if chunk.content:
-                print(chunk.content, end="", flush=True)
-                full_response += chunk.content
-        
-        print()
-        return full_response
+  def __init__(self):
+    self.envConfig = EnvConfigService()
+    self.checkpoint_saver = InMemorySaver()
+    self.graph = self._build_graph()
+
+  def _build_graph(self):
+    graph = StateGraph(AgentState)
+
+    async def generate_response(state: AgentState):
+      client = ChatOpenAI(
+        model="gpt-4o-mini",
+        api_key=self.envConfig.get_openai_api_key(),
+        streaming=True,
+      )
+
+      try:
+        # The checkpoint saver automatically provides previous messages
+        messages = state.get("messages", [])
+
+        # Add system message only if it's the first interaction
+        if not messages:
+          messages = [
+            SystemMessage(
+              "You are a helpful assistant, your task is to answer the user's questions."
+            )
+          ]
+
+        # Add current user input
+        messages.append(HumanMessage(state["input"]))
+
+        response = await client.ainvoke(messages)
+
+        return {
+          "messages": messages + [response],
+          "input": state["input"],
+          "output": response.content,
+        }
+      except Exception as e:
+        raise Exception(f"Error while generating response. {e}")
+
+    graph.add_node("generate_response", generate_response)
+
+    graph.set_entry_point("generate_response")
+    graph.add_edge("generate_response", END)
+
+    return graph.compile(checkpointer=self.checkpoint_saver)
+
+  async def run(self, user_input: str, thread_id: str = "asd123"):
+    initial_state = AgentState(input=user_input, output="")
+    config = {"configurable": {"thread_id": thread_id}}
+    result = await self.graph.ainvoke(initial_state, config=config)
+
+    return result["output"]
+
+  def get_conversation_history(self, thread_id: str):
+    """Access the automatically saved conversation"""
+    config = {"configurable": {"thread_id": thread_id}}
+    state = self.graph.get_state(config)
+    return state.values.get("messages", [])
 
 
-
-""" Example for running the agent in CMD """
 async def main():
-    agent = ExampleGraph()
-    
-    print("Streaming Agent initialized successfully!")
-    print("You can now interact with the agent. Type 'quit' to exit.\n")
-    
-    while True:
-        user_input = input("You: ").strip()
-        
-        if user_input.lower() in ['quit', 'exit', 'q']:
-            print("Goodbye!")
-            break
-            
-        if not user_input:
-            print("Please enter a question or type 'quit' to exit.")
-            continue
-            
-        try:
-            await agent.run(user_input)
-            print()
-        except Exception as e:
-            print(f"Error: {e}\n")
+  """Example for running the agent in CMD"""
+  agent = ExampleGraph()
+
+  print("You can now interact with the agent. Type 'quit' to exit.\n")
+
+  while True:
+    user_input = input("You: ").strip()
+
+    if user_input.lower() in ["quit", "exit", "q"]:
+      break
+
+    if not user_input:
+      print("Please enter a question or type 'quit' to exit.")
+      continue
+
+    try:
+      response = await agent.run(user_input)
+      print("Agent: ", end="", flush=True)
+      print(response)
+      print()
+    except Exception as e:
+      print(f"Error: {e}\n")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+  asyncio.run(main())
