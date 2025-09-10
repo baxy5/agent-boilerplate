@@ -18,7 +18,7 @@ class EnvConfigService(BaseSettings):
   PSQL_USERNAME: str
   PSQL_PASSWORD: SecretStr
   PSQL_HOST: str
-  PSQL_PORT: str
+  PSQL_PORT: int = 5432
   PSQL_DATABASE: str
   PSQL_SSLMODE: str = "disable"
 
