@@ -1,12 +1,13 @@
 import asyncio
-from typing import TypedDict
+from typing import Annotated, TypedDict
 
+from fastapi import Depends
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 
-from app.services.env_config_service import EnvConfigService
+from app.services.env_config_service import EnvConfigService, get_env_configs
 
 
 class AgentState(TypedDict):
@@ -18,8 +19,8 @@ class AgentState(TypedDict):
 class ExampleGraph:
   """This Graph implementation serves only for example purposes."""
 
-  def __init__(self):
-    self.envConfig = EnvConfigService()
+  def __init__(self, env_config: Annotated[EnvConfigService, Depends(get_env_configs)]):
+    self.env_config = env_config
     self.checkpoint_saver = InMemorySaver()
     self.graph = self._build_graph()
 
@@ -29,7 +30,7 @@ class ExampleGraph:
     async def generate_response(state: AgentState):
       client = ChatOpenAI(
         model="gpt-4o-mini",
-        api_key=self.envConfig.get_openai_api_key(),
+        api_key=self.env_config.OPENAI_API_KEY,
         streaming=True,
       )
 

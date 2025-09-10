@@ -1,15 +1,44 @@
-import os
+from functools import lru_cache
+from typing import ClassVar
 
 from dotenv import load_dotenv
+from pydantic import SecretStr, computed_field
+from pydantic_core import MultiHostUrl
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
 
 
-class EnvConfigService:
-  """Environment variable configuration class."""
+class EnvConfigService(BaseSettings):
+  model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
+    env_file=".env", extra="ignore", validate_default=True
+  )
 
-  def get_openai_api_key(self) -> str:
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
-      raise RuntimeError("OPENAI_API_KEY is not set.")
-    return key
+  OPENAI_API_KEY: SecretStr
+  PSQL_USERNAME: str
+  PSQL_PASSWORD: SecretStr
+  PSQL_HOST: str
+  PSQL_PORT: str
+  PSQL_DATABASE: str
+  PSQL_SSLMODE: str = "disable"
+
+  def __get_postgres_url(self, scheme: str) -> MultiHostUrl:
+    return MultiHostUrl.build(
+      scheme=scheme,
+      username=self.PSQL_USERNAME,
+      password=self.PSQL_PASSWORD.get_secret_value(),
+      host=self.PSQL_HOST,
+      path=self.PSQL_DATABASE,
+      port=self.PSQL_PORT,
+      query=f"sslmode={self.PSQL_SSLMODE}",
+    )
+
+  @computed_field
+  @property
+  def postgres_url(self) -> MultiHostUrl:
+    return self.__get_postgres_url("postgresql")
+
+
+@lru_cache
+def get_env_configs() -> EnvConfigService:
+  return EnvConfigService()
