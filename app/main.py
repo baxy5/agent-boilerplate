@@ -1,6 +1,7 @@
-from examples.graph_example import ExampleGraph
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.endpoints import graph_example_route
 
 app = FastAPI()
 
@@ -21,8 +22,4 @@ def read_root():
   return {"Hello": "World"}
 
 
-@app.get("/example")
-async def example_root(input: str, thread_id: str = "asd123"):
-  agent = ExampleGraph()
-  response = await agent.run(input, thread_id)
-  return response
+app.include_router(graph_example_route.router, prefix="/example", tags=["Examples"])

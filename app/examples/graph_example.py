@@ -63,6 +63,7 @@ class ExampleGraph:
     return graph.compile(checkpointer=self.checkpoint_saver)
 
   async def run(self, user_input: str, thread_id: str = "asd123"):
+    """This function helps to debug the agent from the CMD."""
     initial_state = AgentState(input=user_input, output="")
     config = {"configurable": {"thread_id": thread_id}}
     result = await self.graph.ainvoke(initial_state, config=config)
