@@ -1,27 +1,33 @@
-import asyncio
-from typing import Annotated, TypedDict
+import operator
+from typing import Annotated, Sequence, TypedDict
 
-from fastapi import Depends
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from fastapi import Depends, Request
+from langchain_core.messages import AIMessage, AnyMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 
 from app.services.env_config_service import EnvConfigService, get_env_configs
 
 
+def get_checkpointer(req: Request) -> BaseCheckpointSaver:
+  return req.app.state.checkpointer
+
+
 class AgentState(TypedDict):
-  input: str
-  output: str
-  chat_history: list[BaseMessage]
+  messages: Annotated[Sequence[AnyMessage], operator.add]
 
 
 class ExampleGraph:
   """This Graph implementation serves only for example purposes."""
 
-  def __init__(self, env_config: Annotated[EnvConfigService, Depends(get_env_configs)]):
+  def __init__(
+    self,
+    env_config: Annotated[EnvConfigService, Depends(get_env_configs)],
+    checkpointer: Annotated[BaseCheckpointSaver, Depends(get_checkpointer)],
+  ):
     self.env_config = env_config
-    self.checkpoint_saver = InMemorySaver()
+    self.checkpoint_saver = checkpointer
     self.graph = self._build_graph()
 
   def _build_graph(self):
@@ -34,25 +40,19 @@ class ExampleGraph:
         streaming=True,
       )
 
-      messages = [
-        SystemMessage("You are a helpful assistant, your task is to answer the user's questions."),
-        *state.get("chat_history", []),
-        HumanMessage(state["input"]),
-      ]
+      messages = state["messages"]
+
+      # Add system message only if it's the first interaction
+      if not messages or not any(isinstance(msg, SystemMessage) for msg in messages):
+        system_message = SystemMessage(
+          "You are a helpful assistant, your task is to answer the user's questions."
+        )
+        messages = [system_message] + list(messages)
 
       try:
         response = await client.ainvoke(messages)
 
-        # Append new messages to history
-        updated_history = [
-          *state.get("chat_history", []),
-          HumanMessage(content=state["input"]),
-          AIMessage(content=response.content),
-        ]
-
-        state["output"] = response.content
-        state["chat_history"] = updated_history
-        return state
+        return {"messages": [AIMessage(content=response.content)]}
       except Exception as e:
         raise Exception(f"Error while generating response. {e}")
 
@@ -62,40 +62,3 @@ class ExampleGraph:
     graph.add_edge("generate_response", END)
 
     return graph.compile(checkpointer=self.checkpoint_saver)
-
-  async def run(self, user_input: str, thread_id: str = "asd123"):
-    """This function helps to debug the agent from the CMD."""
-    initial_state = AgentState(input=user_input, output="")
-    config = {"configurable": {"thread_id": thread_id}}
-    result = await self.graph.ainvoke(initial_state, config=config)
-
-    return result["output"]
-
-
-async def main():
-  """Example for running the agent in CMD"""
-  agent = ExampleGraph()
-
-  print("You can now interact with the agent. Type 'quit' to exit.\n")
-
-  while True:
-    user_input = input("You: ").strip()
-
-    if user_input.lower() in ["quit", "exit", "q"]:
-      break
-
-    if not user_input:
-      print("Please enter a question or type 'quit' to exit.")
-      continue
-
-    try:
-      response = await agent.run(user_input)
-      print("Agent: ", end="", flush=True)
-      print(response)
-      print()
-    except Exception as e:
-      print(f"Error: {e}\n")
-
-
-if __name__ == "__main__":
-  asyncio.run(main())
