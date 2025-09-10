@@ -30,7 +30,6 @@ class EnvConfigService(BaseSettings):
       host=self.PSQL_HOST,
       path=self.PSQL_DATABASE,
       port=self.PSQL_PORT,
-      query=f"sslmode={self.PSQL_SSLMODE}",
     )
 
   @computed_field
