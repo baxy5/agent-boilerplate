@@ -16,6 +16,7 @@ langchain = { extras = ["openai"], version = "^0.3.27" }
 langgraph-checkpoint-postgres = "2.0.23"
 pydantic-settings = "^2.2.1"
 psycopg = {extras = ["binary"], version = "^3.2.10"}
+langchain-tavily = "^0.2.11"
 
 
 [tool.poetry.group.dev.dependencies]

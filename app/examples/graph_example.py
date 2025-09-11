@@ -2,10 +2,13 @@ import operator
 from typing import Annotated, Sequence, TypedDict
 
 from fastapi import Depends, Request
-from langchain_core.messages import AIMessage, AnyMessage, SystemMessage
+from langchain_core.messages import AnyMessage, SystemMessage
+from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langchain_tavily import TavilySearch
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
+from langgraph.prebuilt import ToolNode
 
 from app.services.env_config_service import EnvConfigService, get_env_configs
 
@@ -28,7 +31,18 @@ class ExampleGraph:
   ):
     self.env_config = env_config
     self.checkpoint_saver = checkpointer
+    self.tools = [self._create_tavily_tool()]
     self.graph = self._build_graph()
+
+  def _create_tavily_tool(self):
+    @tool
+    async def tavily_search_tool(input: str) -> str:
+      """Example web search tool."""
+      tool = TavilySearch(api_key=self.env_config.TAVILY_API_KEY, max_results=1)
+      result = tool.invoke(input)
+      return result["results"][0]["content"]
+
+    return tavily_search_tool
 
   def _build_graph(self):
     graph = StateGraph(AgentState)
@@ -40,6 +54,8 @@ class ExampleGraph:
         streaming=True,
       )
 
+      client_with_tools = client.bind_tools(self.tools)
+
       messages = state["messages"]
 
       # Add system message only if it's the first interaction
@@ -50,15 +66,28 @@ class ExampleGraph:
         messages = [system_message] + list(messages)
 
       try:
-        response = await client.ainvoke(messages)
+        response = await client_with_tools.ainvoke(messages)
 
-        return {"messages": [AIMessage(content=response.content)]}
+        return {"messages": [response]}
       except Exception as e:
         raise Exception(f"Error while generating response. {e}")
 
+    def router(state: AgentState):
+      messages = state["messages"]
+      last_message = messages[-1]
+
+      if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+        return "tools"
+
+      return END
+
     graph.add_node("generate_response", generate_response)
+    graph.add_node("tools", ToolNode(self.tools))
 
     graph.set_entry_point("generate_response")
-    graph.add_edge("generate_response", END)
+
+    graph.add_conditional_edges("generate_response", router, {"tools": "tools", END: END})
+
+    graph.add_edge("tools", "generate_response")
 
     return graph.compile(checkpointer=self.checkpoint_saver)

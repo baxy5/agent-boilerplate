@@ -15,6 +15,8 @@ class EnvConfigService(BaseSettings):
   )
 
   OPENAI_API_KEY: SecretStr
+  TAVILY_API_KEY: SecretStr
+
   PSQL_USERNAME: str
   PSQL_PASSWORD: SecretStr
   PSQL_HOST: str
