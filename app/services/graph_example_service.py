@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException
 from langchain_core.messages import HumanMessage
 from langgraph.checkpoint.base import RunnableConfig
 
-from app.examples.graph_example import ExampleGraph
+from app.agents.graph_example import ExampleGraph
 
 
 class GraphExampleService:
