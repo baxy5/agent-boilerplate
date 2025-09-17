@@ -27,6 +27,5 @@ class ChatAgentExample:
       response = await self.llm.ainvoke(messages)
 
       return {"messages": [response], "current_agent": "END"}
-    except Exception as e:
-      error_msg = f"Summary agent error: {str(e)}"
-      return {"summary_data": error_msg, "current_agent": "supervisor"}
+    except Exception:
+      return {"messages": [], "current_agent": "END"}

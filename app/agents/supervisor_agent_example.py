@@ -45,14 +45,13 @@ class SupervisorAgentExample:
 
     next_agent = response.content.strip().lower()
 
+    print(f"Iteration count: {state.get('iteration_count', 0)}")
     if state.get("iteration_count", 0) > 5:
       next_agent = "END"
-    elif not state.get("research_data") and "search" in str(last_message).lower():
+    elif not state.get("research_data") and next_agent != "chat":
       next_agent = "researcher"
-    elif state.get("research_data") and not state.get("summary_data"):
+    elif state.get("research_data"):
       next_agent = "summary"
-    elif state.get("summary_data"):
-      next_agent = "END"
 
     # decision_message = AIMessage(content=f"Supervisor decision: Route to {next_agent}")
     print(f"Supervisor decision: Route to {next_agent}")

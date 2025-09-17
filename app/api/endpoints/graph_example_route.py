@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 
 from app.models.example_model import MultiAgentRequest
 from app.services.graph_example_service import GraphExampleService
@@ -24,6 +25,6 @@ async def multi_example_generate(
   req: MultiAgentRequest, service: Annotated[MultiAgentOrchestratorExample, Depends()]
 ):
   try:
-    return await service.generate(req)
+    return StreamingResponse(service.generate(req), media_type="text/event-stream")
   except Exception as e:
     raise HTTPException(status_code=500, detail=f"Multi agent example generation have failed, {e}")

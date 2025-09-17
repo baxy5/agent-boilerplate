@@ -21,6 +21,7 @@ class ResearchAgentExample:
     async def tavily_search_tool(input: str) -> str:
       """Web search tool for gathering information."""
       try:
+        print("Tavily Search Tool Invoked...")
         tool = TavilySearch(api_key=self.env_config.TAVILY_API_KEY, max_results=1)
         result = tool.invoke(input)
         return result["results"][0]["content"]
@@ -31,7 +32,7 @@ class ResearchAgentExample:
 
   async def research(self, state: MultiAgentState):
     system_message = SystemMessage(
-      content="You are a research agent. Use the search tool to gather comprehensive information about the user's query. Provide detailed findings."
+      content="You are a research agent. Use the search tool to gather comprehensive information about the user's query. Provide detailed findings. If you couldn't find or provide information, then say I couldn't find any information."
     )
 
     client_with_tools = self.llm.bind_tools(self.tools)

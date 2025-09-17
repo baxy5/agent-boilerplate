@@ -24,7 +24,7 @@ class SummaryAgentExample:
       )
     )
     last_message = state["messages"][-1]
-    research_message = HumanMessage(content=state["research_data"])
+    research_message = HumanMessage(content=f"Research data: {state['research_data']}")
 
     summary_messages = [system_prompt, last_message, research_message]
 
@@ -33,9 +33,8 @@ class SummaryAgentExample:
 
       return {
         "messages": [response],
-        "summary_data": response.content,
-        "current_agent": "supervisor",
+        "current_agent": "END",
       }
     except Exception as e:
       error_msg = f"Summary agent error: {str(e)}"
-      return {"summary_data": error_msg, "current_agent": "supervisor"}
+      return {"summary_data": error_msg, "current_agent": "END"}
