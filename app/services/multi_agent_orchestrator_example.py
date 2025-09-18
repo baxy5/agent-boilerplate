@@ -9,6 +9,7 @@ from langgraph.graph import END, StateGraph
 
 from app.agents.chat_agent_example import ChatAgentExample
 from app.agents.graph_example import get_checkpointer
+from app.agents.line_chart_agent_example import LineChartAgentExample
 from app.agents.research_agent_example import ResearchAgentExample
 from app.agents.summary_agent_example import SummaryAgentExample
 from app.agents.supervisor_agent_example import SupervisorAgentExample
@@ -31,6 +32,7 @@ class MultiAgentOrchestratorExample:
     self.research_agent = ResearchAgentExample(env_config=env_config)
     self.summary_agent = SummaryAgentExample(env_config=env_config)
     self.chat_agent = ChatAgentExample(env_config=env_config)
+    self.line_chart_agent = LineChartAgentExample(env_config=env_config)
 
     self.graph = self._build_multi_agent_graph()
 
@@ -42,13 +44,14 @@ class MultiAgentOrchestratorExample:
     graph.add_node("research_agent", self.research_agent.research)
     graph.add_node("summary_agent", self.summary_agent.summary)
     graph.add_node("chat_agent", self.chat_agent.chat)
+    graph.add_node("line_chart_agent", self.line_chart_agent.chart)
 
     def route_to_agent(state: MultiAgentState):
       current_agent = state.get("current_agent", "supervisor")
 
       if current_agent == "END":
         return END
-      elif current_agent in ["supervisor", "researcher", "summary", "chat"]:
+      elif current_agent in ["supervisor", "researcher", "summary", "chat", "line_chart"]:
         return current_agent
       else:
         return "supervisor"
@@ -63,6 +66,7 @@ class MultiAgentOrchestratorExample:
         "researcher": "research_agent",
         "summary": "summary_agent",
         "chat": "chat_agent",
+        "line_chart": "line_chart_agent",
         END: END,
       },
     )
@@ -75,6 +79,7 @@ class MultiAgentOrchestratorExample:
         "researcher": "research_agent",
         "summary": "summary_agent",
         "chat": "chat_agent",
+        "line_chart": "line_chart_agent",
         END: END,
       },
     )
@@ -87,6 +92,7 @@ class MultiAgentOrchestratorExample:
         "researcher": "research_agent",
         "summary": "summary_agent",
         "chat": "chat_agent",
+        "line_chart": "line_chart_agent",
         END: END,
       },
     )
@@ -99,6 +105,20 @@ class MultiAgentOrchestratorExample:
         "researcher": "research_agent",
         "summary": "summary_agent",
         "chat": "chat_agent",
+        "line_chart": "line_chart_agent",
+        END: END,
+      },
+    )
+
+    graph.add_conditional_edges(
+      "line_chart_agent",
+      route_to_agent,
+      {
+        "supervisor": "supervisor_agent",
+        "researcher": "research_agent",
+        "summary": "summary_agent",
+        "chat": "chat_agent",
+        "line_chart": "line_chart_agent",
         END: END,
       },
     )
@@ -119,7 +139,6 @@ class MultiAgentOrchestratorExample:
     self.graph.get_graph().draw_mermaid_png(output_file_path="images/graph.png")
 
   async def generate(self, req: MultiAgentRequest):
-    """"""
     self.draw_graph()
 
     config = RunnableConfig(configurable={"thread_id": req.session_id})
@@ -131,7 +150,6 @@ class MultiAgentOrchestratorExample:
 
     initial_state = {
       "research_data": "",
-      "summary_data": "",
       "iteration_count": 0,
       "agent_decisions": {},
       "messages": existing_messages + [HumanMessage(content=req.input)],
@@ -154,6 +172,8 @@ class MultiAgentOrchestratorExample:
           yield 'data: {"type": "progress", "content": "Generating response", "icon": "notebook"}\n\n'
         elif event_name == "supervisor_agent":
           yield 'data: {"type": "progress", "content": "Planning next step", "icon": "brain"}\n\n'
+        elif event_name == "line_chart_agent":
+          yield 'data: {"type": "progress", "content": "Generating line chart", "icon": "notebook"}\n\n'
 
       # Handle agent completion events
       if event_type == "on_chain_end":
@@ -163,6 +183,14 @@ class MultiAgentOrchestratorExample:
           yield 'data: {"type": "progress", "content": "Summary completed", "icon": "check"}\n\n'
         elif event_name == "chat_agent":
           yield 'data: {"type": "progress", "content": "Response completed", "icon": "check"}\n\n'
+        elif event_name == "line_chart_agent":
+          event_data = event.get("data", {})
+          output = event_data.get("output", {})
+          if output and "messages" in output and output["messages"]:
+            chart_data = output["messages"][0]
+            payload = {"type": "content", "option": chart_data}
+            yield f"data: {json.dumps(payload)}\n\n"
+          yield 'data: {"type": "progress", "content": "Line chart generation completed", "icon": "check"}\n\n'
 
       if event_type == "on_tool_start":
         tool_name = event["name"]
@@ -194,10 +222,11 @@ class MultiAgentOrchestratorExample:
           continue
         elif event_metadata_node == "research_agent":
           continue
-
-        chunk_content = self.serialise_ai_message_chunk(event["data"]["chunk"])
-        payload = {"type": "content", "content": chunk_content}
-
-        yield f"data: {json.dumps(payload)}\n\n"
+        elif event_metadata_node == "line_chart_agent":
+          continue
+        else:
+          chunk_content = self.serialise_ai_message_chunk(event["data"]["chunk"])
+          payload = {"type": "content", "content": chunk_content}
+          yield f"data: {json.dumps(payload)}\n\n"
 
     yield 'data: {"type": "end"}\n\n'

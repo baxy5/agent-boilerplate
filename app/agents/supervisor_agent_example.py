@@ -20,7 +20,6 @@ class SupervisorAgentExample:
     if not last_message:
       return {"current_agent": "supervisor"}
 
-    # Supervisor prompt
     supervisor_prompt = f"""
     You are a supervisor agent managing a multi-agent system. 
     Analyze the following user request and determine the best workflow:
@@ -31,33 +30,32 @@ class SupervisorAgentExample:
     1. researcher - For web searches and information gathering
     2. summary - For creating final responses and content
     3. chat - Handles direct questions, requirements or just chatting that don't require other agents' collaboration
+    4. line_chart - For generating eChart options for a line chart.
     
     Current state:
     - Research data available: {bool(state.get("research_data"))}
-    - Summary completed: {bool(state.get("summary_data"))}
     - Iteration: {state.get("iteration_count", 0)}
     
-    Respond with ONLY the next agent name that should handle this task: researcher, summary, chat or END.
+    Respond with ONLY the next agent name that should handle this task: researcher, summary, chat, line_chart or END.
     """
 
     system_message = SystemMessage(content=supervisor_prompt)
     response = await self.llm.ainvoke([system_message])
 
     next_agent = response.content.strip().lower()
+    print(f"First supervisor decision: {next_agent}")
 
     print(f"Iteration count: {state.get('iteration_count', 0)}")
     if state.get("iteration_count", 0) > 5:
       next_agent = "END"
-    elif not state.get("research_data") and next_agent != "chat":
+    elif not state.get("research_data") and next_agent not in ("chat", "line_chart"):
       next_agent = "researcher"
     elif state.get("research_data"):
       next_agent = "summary"
 
-    # decision_message = AIMessage(content=f"Supervisor decision: Route to {next_agent}")
     print(f"Supervisor decision: Route to {next_agent}")
 
     return {
-      #   "messages": [decision_message],
       "current_agent": next_agent,
       "agent_decisions": {**state.get("agent_decisions", {}), "supervisor": next_agent},
       "iteration_count": state.get("iteration_count", 0) + 1,

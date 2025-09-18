@@ -47,11 +47,10 @@ output = llm_with_structured_output.invoke(
   "Please respond in JSON format with both 'text' (description), 'title' (title) and 'option' (ECharts configuration object) fields."
 )
 print(output)
-
 print("-----------------------------------------------")
 
 validated_output = OutputSchema.model_validate(output)
-print(validated_output)
+print(validated_output.model_dump())
 
 """ Example for validating with jsonschema. """
 
