@@ -139,7 +139,7 @@ class MultiAgentOrchestratorExample:
     self.graph.get_graph().draw_mermaid_png(output_file_path="images/graph.png")
 
   async def generate(self, req: MultiAgentRequest):
-    self.draw_graph()
+    # self.draw_graph()
 
     config = RunnableConfig(configurable={"thread_id": req.session_id})
 

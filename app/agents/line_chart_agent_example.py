@@ -64,10 +64,12 @@ class LineChartAgentExample:
 
     try:
       response = await self.llm_with_structured_output.ainvoke(line_chart_messages)
+
       try:
         # Validate the response and save to the messages state
         validated_response = ChartConfig.model_validate(response)
         validated_dict = validated_response.model_dump()
+
         return {"messages": [validated_dict], "current_agent": "END"}
       except Exception as e:
         print(f"Model validation failed. {e}")
