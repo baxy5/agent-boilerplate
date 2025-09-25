@@ -143,16 +143,11 @@ class MultiAgentOrchestratorExample:
 
     config = RunnableConfig(configurable={"thread_id": req.session_id})
 
-    existing_messages = []
-    current_state = await self.graph.aget_state(config=config)
-    if current_state and current_state.values:
-      existing_messages = current_state.values.get("messages", [])
-
     initial_state = {
       "research_data": "",
       "iteration_count": 0,
       "agent_decisions": {},
-      "messages": existing_messages + [HumanMessage(content=req.input)],
+      "messages": [HumanMessage(content=req.input)],
     }
 
     events = self.graph.astream_events(initial_state, version="v2", config=config)

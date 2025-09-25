@@ -47,7 +47,7 @@ class ResearchAgentExample:
     tool_map = {tool.name: tool for tool in self.tools}
 
     # research agent system message + input from message which already added in the orchestrator
-    research_messages = [system_message, state["messages"][-1]]
+    research_messages = [system_message] + state["messages"]
 
     try:
       response = await client_with_tools.ainvoke(research_messages)
