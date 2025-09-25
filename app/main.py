@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.api.endpoints import graph_example_route
+from app.models.chat_session import ChatSession, Message  # noqa: F401
 from app.services.env_config_service import get_env_configs
 
 

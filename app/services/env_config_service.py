@@ -23,6 +23,7 @@ class EnvConfigService(BaseSettings):
   PSQL_PORT: int = 5432
   PSQL_DATABASE: str
   PSQL_SSLMODE: str = "disable"
+  PSQL_CHAT_SESSIONS_SCHEMA: str = "chat_sessions"
 
   def __get_postgres_url(self, scheme: str) -> MultiHostUrl:
     return MultiHostUrl.build(
