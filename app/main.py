@@ -3,7 +3,7 @@ from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
-from app.api.endpoints import graph_example_route
+from app.api.endpoints import graph_example_route, sqlalchemy_route_example
 from app.models.chat_session import ChatSession, Message  # noqa: F401
 from app.services.env_config_service import get_env_configs
 
@@ -41,3 +41,4 @@ def read_root():
 
 
 app.include_router(graph_example_route.router, prefix="/example", tags=["Examples"])
+app.include_router(sqlalchemy_route_example.router, prefix="/db", tags=["Database"])
